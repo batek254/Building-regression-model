@@ -1,0 +1,456 @@
+---
+title: "Projekt 3.0"
+author: "Bartłomiej Fatyga"
+date: "25 maja 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+load("myData.RData")
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(corrplot)
+library(broom)
+library(reshape2)
+library(tseries)
+```
+
+# Budowa modelu liniowego za pomocą klasycznych metod ekonometrycznych oraz metod boostrapowaych.
+
+## Opis problemu
+Celem projektu jest budowa liniowego modelu dla spalania w danych dotyczących samochodów osobowych z pliku cars.csv. Kolejnym etapem jest porówananie modelu zbudowanego za pomocą klasycznych metod ekonometrycznych z modelem zbudowanym za pomocą metod boostrapowych. 
+
+## Przedstawienie hipotez
+Hipoteza 1: Zmienne dobrane za pomocą metod boostrapowych charakteryzują się "lepszymi" przedziałami ufności tj. większość wyników będzie skupiona bliżej średniej. 
+
+## Opis danych
+Naszą próbkę stanowić będą dane z pliku cars.csv. Opisują one wiele samochodów dostępnych na rynku w latach 19`r min(samochodziki$year)` - 19`r max(samochodziki$year)`. Opisywane parametry:
+
+* mpg - spalanie w galonach na milę
+* cylinders - liczba cylindrów
+* displacement - objętość silnika w calach sześciennych
+* horsepower - moc w koniach mechanicznych
+* weight - waga w funtach
+* acceleration - czas przyspieszenia do 0 do 60 mil na godzinę, podany w sekundach
+* year - rok produkcji
+* origin - miejsce produkcji
+* name - nazwa samochodu
+
+Pierwszą część analizy zacząłem od przekształcenia jednostek na system europejski, z wyłączeniem *acceleration*, gdyż taka zamiana nie byłaby możliwa. W takim wypadku zmienna *mpg* zmienia nazwę na *lp100k*. Po wszystkich przekształceniach dane przyjmują postać:
+```{r}
+head(samochodziki, 10)
+```
+
+#Analiza wizualna oraz opisowa
+
+##Podstawowe statystki opisowe
+```{r}
+summary(samochodziki[1:7])
+```
+
+Podstawowe statystyki opisowe sugerują nam, że mamy do czynienia z bardzo zróżnicowanymi danymi.
+
+##Wizualizacja danych
+
+###Wykres spalania od pojemności z uwzględnieniem liczby koni mechanicznych
+```{r, echo=FALSE, message=FALSE}
+samochodziki %>% 
+  ggplot(aes(x = displacement,  y = lp100k, size = horsepower)) +
+  geom_smooth() +
+  geom_jitter(aes(col = as.factor(origin))) +
+  scale_colour_discrete(name  ="Pochodzenie",
+                        labels=c("USA", "Europa", "Japonia"))
+```
+
+Pierwszy wykres dostarcza nam bardzo wielu informacji:
+
+* Wyraźnie widać, że USA produkuje samochody o największej pojemności silnika.
+* Widać trend rosnący -> wraz ze wzrostem pojemności silnika powinniśmy się spodziewać wzrostu średniego spalania.
+* Dane sugerują nam również korelację między pojemnością silnika, a liczbą koni mechanicznych, co może nam utrudnić analizę.
+
+###Wykres spalania od cylindrów
+```{r, echo=FALSE, message=FALSE}
+samochodziki %>% 
+  ggplot(aes(x = cylinders,  y = lp100k)) +
+  geom_jitter(aes(col = as.factor(origin))) +
+  scale_colour_discrete(name  ="Pochodzenie",
+                        labels=c("USA", "Europa", "Japonia")) 
+```
+
+* Jak w poprzednim wykresie samochody o największej ilości cylindrów produkowane są w USA.
+* Widoczny jest wzrost spalania wraz ze wzrostem liczby cylindrów. Może to nam sugerować kolejną korelację liczby cylindrów, z pojemnością silnika lub/oraz z liczbą koni mechanicznych.
+
+###Wykres spalania od koni mechanicznych
+```{r, echo=FALSE, message=FALSE}
+samochodziki %>%
+  ggplot(aes(x = horsepower, y = lp100k)) +
+  geom_point(aes(col = as.factor(origin))) +
+  geom_smooth() +
+  scale_colour_discrete(name  ="Pochodzenie",
+                        labels=c("USA", "Europa", "Japonia")) 
+```
+
+Biorąc pod uwagę poprzednie wykresy możemy stwierdzić, iż ten wykres nie dostarcza nam wielu istotnych informacji, oprócz potwierdzenia, że liczba koni mechanicznych jest związana ze spalaniem.
+
+###Wykres spalania od wagi
+```{r, echo=FALSE, message=FALSE}
+samochodziki %>%
+  ggplot(aes(x = weight, y = lp100k, size = horsepower)) +
+  geom_point(aes(col = as.factor(origin))) +
+  geom_smooth() +
+  scale_colour_discrete(name  ="Pochodzenie",
+                        labels=c("USA", "Europa", "Japonia")) 
+```
+
+Po raz kolejny pozwoliłem sobie dodać do wykresu liczbę koni mechanicznych, by uchwycić pewne zależności.
+
+* Waga ma dodatni wpływ na spalanie.
+* Waga samochodu może być skorelowana z liczbą koni mechanicznych.
+
+###Wykres spalania od przyspieszenia
+```{r, echo=FALSE, message=FALSE}
+samochodziki %>%
+  ggplot(aes(x = acceleration, y = lp100k, size = horsepower)) +
+  geom_jitter(aes(col = as.factor(origin))) +
+  geom_smooth() +
+  scale_colour_discrete(name  ="Pochodzenie",
+                        labels=c("USA", "Europa", "Japonia")) 
+```
+ 
+Ten wykres prowadzi do wniosków:
+
+* Liczba koni mechanicznych jest skorelowana z przyspieszeniem (co po raz kolejny nie jest sporym zaskoczeniem).
+* Najszybsze samochody są produkowane w USA.
+* Można również pokusić się o stwierdzenie, że samochody produkowane w Europie i Japoni charakteryzują się mnieszym spalaniem, przy porównywalnym przyspieszenie niż samochody produkowane w USA.
+* Nie widać gładkiej liniwej zależności między spalaniem, a przyspieszniem. Jednak istnieje ujemna zależność między spalanie, a przyspieszeniem.
+
+###Wykres spalania od roku produkcji
+```{r, echo=FALSE, message=FALSE}
+samochodziki %>%
+  ggplot(aes(x = as.factor(year), y = lp100k)) +
+  geom_boxplot() +
+  geom_jitter(aes(col = as.factor(origin)), width = .3) +
+  scale_colour_discrete(name  ="Pochodzenie",
+                        labels=c("USA", "Europa", "Japonia"))
+```
+
+Wykres ten obrazuje nam dwie ważne zależności:
+
+* Samochody produkowane w Europie i Japoni charakteryzują się mnieszym spalanie, niż te produkowane w USA.
+* Wyraźnie jest widoczny malejący trend. Z kolejnumi latami średnie spalanie spadało. Dodatkowo można dodać, że najwięcej spadało wśród samochodów produkwanych w USA.
+
+Dostrzegając spore zagrożenie korelacji zdecydowałem się stworzyć macierz korealcji, by sprawdzić swoje przypuszczenia.
+
+###Macierz korelacji
+```{r}
+cor(samochodziki[1:7])
+```
+
+Z powodu sposobu wyświetlania danych lepiej w tym przypadku posłużyć się wykresem, który zobrazuje nam te korelacje.
+
+```{r, echo=FALSE, message=FALSE}
+corrplot(cor(samochodziki[1:7]), method = "circle")
+```
+
+Wykres ten w dobitny sposób wskazuję nam, że zmienne *cylinders, displacement, horsepower, weight* są ze sobą silnie skorelowane. Resztę zależności udało nam się wykryć w poprzedniach wykresach.
+
+##Podsumowanie analizy wizualnej oraz opisowej
+Po pierwsze ze względu na korelację między zmiennymi  *cylinders, displacement, horsepower, weight* możemy spodziewać się, że część z nich nie znajdzie się w naszym modelu. Korelacja między *acceleration*, a *horsepower* sugeruję, że w naszym modelu możemy spodziewać się jednej z tych dwóch zmiennych. Dodatkowo w naszym modelu powinna znaleźć się zmienna *year*, gdyż charakteryzuje się korelacją ze spalanie, a korelacje między resztą zmiennych nie są znaczące.
+
+#Budowa modelu liniowego
+
+##Metoda backward selection
+
+###Pierwszy model
+```{r, echo=FALSE}
+summary(lm(lp100k ~ cylinders+displacement+horsepower+weight+acceleration+year+as.factor(origin), data = samochodziki))
+```
+
+W tym modelu zmienną o największym p-value jest *acceleration* więc to ją zdecydowałem się odrzucić.
+
+###Drugi model
+```{r, echo=FALSE}
+summary(lm(lp100k ~ cylinders+displacement+horsepower+weight+year+as.factor(origin), data = samochodziki))
+```
+
+Największe p-value -> zmienna *cylinders* -> odrzucamy.
+
+###Trzeci model
+```{r, echo=FALSE}
+summary(lm(lp100k ~ displacement+horsepower+weight+year+as.factor(origin), data = samochodziki))
+```
+
+Odrzucamy zmienną *displacement*.
+
+###Czwarty model
+```{r, echo=FALSE}
+summary(lm(lp100k ~ horsepower+weight+year+as.factor(origin), data = samochodziki))
+```
+
+Na tym etapie decydujemy się odrzucić zmienną *origin*.
+
+###Piąty model
+```{r, echo=FALSE}
+summary(lm(lp100k ~ horsepower+weight+year, data = samochodziki))
+model_classic <- lm(lp100k ~ horsepower+weight+year, data = samochodziki)
+```
+
+Możemy zakwalifkiować ten model jako najlepszy i użyjemy go do reszty naszych analiz.
+
+##Wykres wartości rzeczywistych i dopasowanych
+```{r, echo = FALSE}
+samochodziki %>% 
+  mutate(dopasowane = model_classic$fitted.values) %>% 
+  arrange(lp100k) %>%
+  mutate(index = 1:nrow(samochodziki)) %>%
+  ggplot(aes(x = index)) +
+  geom_point(aes(y = lp100k), color = "red") +
+  geom_point(aes(y = dopasowane), color = "blue")
+```
+
+##Test Jarque-Bera dla normalności
+```{r, echo = FALSE}
+jarque.bera.test(model_classic$residuals)
+```
+Odczytując *p-value* testu nie możemy odrzucić hipotezy stanowiącej, że próbka ma rozkład normalny.
+
+
+##Próba bootstrap na podstawie obserwacji
+```{r, echo = FALSE}
+#parametr przy log10
+par_hors_vect <- rep(NA, 10 ^ 5)
+par_weig_vect <- rep(NA, 10 ^ 5)
+par_year_vect <- rep(NA, 10 ^ 5)
+
+data_test <- samochodziki
+str(data_test)
+
+set.seed(123)
+for(i in 1:10^5){
+  boot_sample <- sample(1:nrow(data_test), 
+                        nrow(data_test), 
+                        replace = T)
+  model <- lm(lp100k ~ horsepower + weight + year, 
+              data = data_test[boot_sample, ])
+  par_hors_vect[i] <- coef(model)[2]
+  par_weig_vect[i] <- coef(model)[3]
+  par_year_vect[i] <- coef(model)[4]
+}
+```
+
+Kolejno dla *horsepower, weight, year*:
+```{r, echo = FALSE}
+summary(par_hors_vect)
+summary(par_weig_vect)
+summary(par_year_vect)
+```
+
+##Przedziały ufności dla modelu klasycznego
+
+###90% przedział ufności dla zmiennej *horsepower*:
+
+```{r, echo = FALSE}
+#90% przedział ufności dla horsepower
+coefs_mod[2,1] + 
+  qnorm(c(.05, .95)) * coefs_mod[2,2]
+```
+
+###95% przedział ufności dla zmiennej *horsepower*:
+
+```{r, echo = FALSE}
+#95%
+coefs_mod[2,1] + 
+  qnorm(c(.025, .975)) * coefs_mod[2,2]
+```
+
+###99% przedział ufności dla zmiennej *horsepower*:
+
+```{r, echo = FALSE}
+#99%
+coefs_mod[2,1] + 
+  qnorm(c(.005, .995)) * coefs_mod[2,2]
+```
+
+###90% przedział ufności dla zmiennej *weight*:
+
+```{r, echo = FALSE}
+#90% przedział ufności dla weight
+coefs_mod[3,1] + 
+  qnorm(c(.05, .95)) * coefs_mod[3,2]
+```
+
+###95% przedział ufności dla zmiennej *weight*:
+
+```{r, echo = FALSE}
+#95%
+coefs_mod[3,1] + 
+  qnorm(c(.025, .975)) * coefs_mod[3,2]
+```
+
+###99% przedział ufności dla zmiennej *weight*:
+
+```{r, echo = FALSE}
+#99%
+coefs_mod[3,1] + 
+  qnorm(c(.005, .995)) * coefs_mod[3,2]
+```
+
+###90% przedział ufności dla zmiennej *year*:
+
+```{r, echo = FALSE}
+#90% przedział ufności dla year
+coefs_mod[4,1] + 
+  qnorm(c(.05, .95)) * coefs_mod[4,2]
+```
+
+###95% przedział ufności dla zmiennej *year*:
+
+```{r, echo = FALSE}
+#95%
+coefs_mod[4,1] + 
+  qnorm(c(.025, .975)) * coefs_mod[4,2]
+```
+
+###99% przedział ufności dla zmiennej *year*:
+
+```{r, echo = FALSE}
+#99%
+coefs_mod[4,1] + 
+  qnorm(c(.005, .995)) * coefs_mod[4,2]
+```
+
+##Przedziały ufności dla modelu bootstrap
+
+###90% przedział ufności dla zmiennej *horsepower*:
+
+```{r, echo = FALSE}
+#90% bootstrapowy przedzial ufnosci 
+##dla horsepower
+quantile(par_hors_vect, c(0.05, 0.95))
+```
+
+###95% przedział ufności dla zmiennej *horsepower*:
+
+```{r, echo = FALSE}
+#95%
+quantile(par_hors_vect, c(0.025, 0.975))
+```
+
+###99% przedział ufności dla zmiennej *horsepower*:
+
+```{r, echo = FALSE}
+#99%
+quantile(par_hors_vect, c(0.005, 0.995))
+```
+
+###90% przedział ufności dla zmiennej *weight*:
+
+```{r, echo = FALSE}
+#90% bootstrapowy przedzial ufnosci 
+##dla weight
+quantile(par_weig_vect, c(0.05, 0.95))
+```
+
+###95% przedział ufności dla zmiennej *weight*:
+
+```{r, echo = FALSE}
+#95%
+quantile(par_weig_vect, c(0.025, 0.975))
+```
+
+###99% przedział ufności dla zmiennej *weight*:
+
+```{r, echo = FALSE}
+#99%
+quantile(par_weig_vect, c(0.005, 0.995))
+```
+
+###90% przedział ufności dla zmiennej *year*:
+
+```{r, echo = FALSE}
+#90% bootstrapowy przedzial ufnosci 
+##dla year
+quantile(par_year_vect, c(0.05, 0.95))
+```
+
+###95% przedział ufności dla zmiennej *year*:
+
+```{r, echo = FALSE}
+#95%
+quantile(par_year_vect, c(0.025, 0.975))
+```
+
+###99% przedział ufności dla zmiennej *year*:
+
+```{r, echo = FALSE}
+#99%
+quantile(par_year_vect, c(0.005, 0.995))
+```
+
+##Porównanie przedziałów
+
+###Dla zmiennej *horsepower*
+
+```{r, echo = FALSE}
+set.seed(321)
+par_hors_df <- tibble(bootstrap = par_hors_vect,
+                           classic = 
+                             coefs_mod[2,1] + 
+                             rnorm(10^5) * 
+                             coefs_mod[2,2]) %>%
+  gather(type, parameter)
+
+
+par_hors_df %>%
+  ggplot(aes(x = parameter, col = type)) + 
+  geom_density()
+```
+
+###Dla zmiennej *weight*
+
+```{r, echo = FALSE}
+set.seed(321)
+par_weig_df <- tibble(bootstrap = par_weig_vect,
+                           classic = 
+                             coefs_mod[3,1] + 
+                             rnorm(10^5) * 
+                             coefs_mod[3,2]) %>%
+  gather(type, parameter)
+
+
+par_weig_df %>%
+  ggplot(aes(x = parameter, col = type)) + 
+  geom_density()
+```
+
+###Dla zmiennej *year*
+
+```{r, echo = FALSE}
+set.seed(321)
+par_year_df <- tibble(bootstrap = par_year_vect,
+                           classic = 
+                             coefs_mod[4,1] + 
+                             rnorm(10^5) * 
+                             coefs_mod[4,2]) %>%
+  gather(type, parameter)
+
+
+par_year_df %>%
+  ggplot(aes(x = parameter, col = type)) + 
+  geom_density()
+```
+
+#Podsumowanie. Interpretacja i wnioski z analizy
+
+Zacznę od krótkiego przypomnienia na czym polegały dwa sposoby liczenia przedziałów ufności, jakich wyników się spodziewam w kontrze do tego jakie otrzymałem.
+
+Przede wszystkim musimy pamiętać, że **test-t** w **Metodzie najmniejszych kwadratów** jest uzależniony od założenia normalności reszt modelu. Jeśli jesteśmy pewni, że tak jest to **statystyka t** bardzo dokładnie określa nam "przydatność" parametrów. Dodatkowo dla duży prób (im większe tym lepiej) **rozkład t** zbliża się do rozkładu normalnego, pod warunkiem, że reszty są niezależna i mają taki sam rozkład.
+
+Metody **boostrap** używamy, gdy nie jesteśmy pewnie co założenia normalności reszt, lub próbka jest zbyt mała. Więc przewagą metod **bootstrap** jest ich uniwersalność.
+
+Po wykonaniu testu Jarque-Bera możemy stwierdzić, że reszty mają rozkład normalny, więc wydaje się, że to **Metoda najmnieszych kwadratów** da nam dokładniejsze wyniki. Co zdają się potwierdzać nasze wykresy przedziałów ufności, gdzie paramatery dobrane za pomocą **MNK** posiadają niższe odchylenie standardowe.
+
+Podsumowując możemy odrzucić *Hipotezę 1* ponieważ to właśnie wyniki uzyskane za pomocą metody bootstrap charakteryzują się "gorszymi" przedziałami ufności. Wynika to przede wszystkim ze spełnienia założeń **MNK**, więc co za tym idzie nasze estymatory są **BLUE**, a więc *Best Linear Unbiased Estimator*.
