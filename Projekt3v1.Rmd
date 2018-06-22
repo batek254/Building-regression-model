@@ -60,7 +60,7 @@ Podstawowe statystyki opisowe sugerują nam, że mamy do czynienia z bardzo zró
 samochodziki %>% 
   ggplot(aes(x = displacement,  y = lp100k, size = horsepower)) +
   geom_smooth() +
-  geom_jitter(aes(col = as.factor(origin))) +
+  geom_jitter(aes(col = as.factor(origin)), alpha = 0.4) +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia"))
 ```
@@ -74,10 +74,11 @@ Pierwszy wykres dostarcza nam bardzo wielu informacji:
 ###Wykres spalania od cylindrów
 ```{r, echo=FALSE, message=FALSE}
 samochodziki %>% 
-  ggplot(aes(x = cylinders,  y = lp100k)) +
+  ggplot(aes(x = as.factor(cylinders),  y = lp100k)) +
+  geom_boxplot() +
   geom_jitter(aes(col = as.factor(origin))) +
   scale_colour_discrete(name  ="Pochodzenie",
-                        labels=c("USA", "Europa", "Japonia")) 
+                        labels=c("USA", "Europa", "Japonia"))  
 ```
 
 * Jak w poprzednim wykresie samochody o największej ilości cylindrów produkowane są w USA.
@@ -87,10 +88,10 @@ samochodziki %>%
 ```{r, echo=FALSE, message=FALSE}
 samochodziki %>%
   ggplot(aes(x = horsepower, y = lp100k)) +
-  geom_point(aes(col = as.factor(origin))) +
+  geom_point(aes(col = as.factor(origin)), alpha = 0.6) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
-                        labels=c("USA", "Europa", "Japonia")) 
+                        labels=c("USA", "Europa", "Japonia"))
 ```
 
 Biorąc pod uwagę poprzednie wykresy możemy stwierdzić, iż ten wykres nie dostarcza nam wielu istotnych informacji, oprócz potwierdzenia, że liczba koni mechanicznych jest związana ze spalaniem.
@@ -98,8 +99,8 @@ Biorąc pod uwagę poprzednie wykresy możemy stwierdzić, iż ten wykres nie do
 ###Wykres spalania od wagi
 ```{r, echo=FALSE, message=FALSE}
 samochodziki %>%
-  ggplot(aes(x = weight, y = lp100k, size = horsepower)) +
-  geom_point(aes(col = as.factor(origin))) +
+  ggplot(aes(x = weight, y = lp100k)) +
+  geom_point(aes(col = as.factor(origin)), alpha = 0.8) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia")) 
@@ -114,7 +115,7 @@ Po raz kolejny pozwoliłem sobie dodać do wykresu liczbę koni mechanicznych, b
 ```{r, echo=FALSE, message=FALSE}
 samochodziki %>%
   ggplot(aes(x = acceleration, y = lp100k, size = horsepower)) +
-  geom_jitter(aes(col = as.factor(origin))) +
+  geom_jitter(aes(col = as.factor(origin)), alpha = 0.5) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia")) 
@@ -215,7 +216,7 @@ samochodziki %>%
 ```{r, echo = FALSE}
 jarque.bera.test(model_classic$residuals)
 ```
-Odczytując *p-value* testu nie możemy odrzucić hipotezy stanowiącej, że próbka ma rozkład normalny.
+Odczytując *p-value* testu nie możemy odrzucić hipotezy stanowiącej, że próbka ma rozkład normalny. Sugeruje nam to błędne wyliczenia wartości p-value i wartości t dla modelu. Jednak w przypadku tej ilości danych (314) działają **Centralne Twierdzenia Graniczne**, w związku tym wyliczone wartości możemy uznać za poprawne. 
 
 
 ##Próba bootstrap na podstawie obserwacji
@@ -250,145 +251,142 @@ summary(par_year_vect)
 
 ##Przedziały ufności dla modelu klasycznego
 
-###90% przedział ufności dla zmiennej *horsepower*:
-
 ```{r, echo = FALSE}
 #90% przedział ufności dla horsepower
-coefs_mod[2,1] + 
-  qnorm(c(.05, .95)) * coefs_mod[2,2]
-```
-
-###95% przedział ufności dla zmiennej *horsepower*:
-
-```{r, echo = FALSE}
+horse_90_l <- coefs_mod[2,1] + 
+  qnorm(c(.05)) * coefs_mod[2,2]
+horse_90_p <- coefs_mod[2,1] + 
+  qnorm(c(.95)) * coefs_mod[2,2]
 #95%
-coefs_mod[2,1] + 
-  qnorm(c(.025, .975)) * coefs_mod[2,2]
-```
-
-###99% przedział ufności dla zmiennej *horsepower*:
-
-```{r, echo = FALSE}
+horse_95_l <- coefs_mod[2,1] + 
+  qnorm(c(.025)) * coefs_mod[2,2]
+horse_95_p <- coefs_mod[2,1] + 
+  qnorm(c(.975)) * coefs_mod[2,2]
 #99%
-coefs_mod[2,1] + 
-  qnorm(c(.005, .995)) * coefs_mod[2,2]
+horse_99_l <- coefs_mod[2,1] + 
+  qnorm(c(.005)) * coefs_mod[2,2]
+horse_99_p <- coefs_mod[2,1] + 
+  qnorm(c(.995)) * coefs_mod[2,2]
 ```
 
-###90% przedział ufności dla zmiennej *weight*:
+### Przedziały ufności dla zmiennej *horsepower*:
+| Poziom istotności | Lewy przedział | Prawy przedział |
+|:-----------------:|:--------------:|:---------------:|
+|90%                |`r horse_90_l`  |`r horse_90_p`   |
+|95%                |`r horse_95_l`  |`r horse_95_p`   |
+|99%                |`r horse_99_l`  |`r horse_99_p`   |
 
 ```{r, echo = FALSE}
 #90% przedział ufności dla weight
-coefs_mod[3,1] + 
-  qnorm(c(.05, .95)) * coefs_mod[3,2]
-```
-
-###95% przedział ufności dla zmiennej *weight*:
-
-```{r, echo = FALSE}
+weight_90_l <- coefs_mod[3,1] + 
+  qnorm(c(.05)) * coefs_mod[3,2]
+weight_90_p <- coefs_mod[3,1] + 
+  qnorm(c(.95)) * coefs_mod[3,2]
 #95%
-coefs_mod[3,1] + 
-  qnorm(c(.025, .975)) * coefs_mod[3,2]
-```
-
-###99% przedział ufności dla zmiennej *weight*:
-
-```{r, echo = FALSE}
+weight_95_l <- coefs_mod[3,1] + 
+  qnorm(c(.025)) * coefs_mod[3,2]
+weight_95_p <- coefs_mod[3,1] + 
+  qnorm(c(.975)) * coefs_mod[3,2]
 #99%
-coefs_mod[3,1] + 
-  qnorm(c(.005, .995)) * coefs_mod[3,2]
+weight_99_l <- coefs_mod[3,1] + 
+  qnorm(c(.005)) * coefs_mod[3,2]
+weight_99_p <- coefs_mod[3,1] + 
+  qnorm(c(.995)) * coefs_mod[3,2]
 ```
 
-###90% przedział ufności dla zmiennej *year*:
+### Przedziały ufności dla zmiennej *weight*:
+| Poziom istotności | Lewy przedział | Prawy przedział |
+|:-----------------:|:--------------:|:---------------:|
+|90%                |`r weight_90_l` |`r weight_90_p`  |
+|95%                |`r weight_95_l` |`r weight_95_p`  |
+|99%                |`r weight_99_l` |`r weight_99_p`  |
 
 ```{r, echo = FALSE}
 #90% przedział ufności dla year
-coefs_mod[4,1] + 
-  qnorm(c(.05, .95)) * coefs_mod[4,2]
-```
-
-###95% przedział ufności dla zmiennej *year*:
-
-```{r, echo = FALSE}
+year_90_l <- coefs_mod[4,1] + 
+  qnorm(c(.05)) * coefs_mod[4,2]
+year_90_p <- coefs_mod[4,1] + 
+  qnorm(c(.95)) * coefs_mod[4,2]
 #95%
-coefs_mod[4,1] + 
-  qnorm(c(.025, .975)) * coefs_mod[4,2]
-```
-
-###99% przedział ufności dla zmiennej *year*:
-
-```{r, echo = FALSE}
+year_95_l <- coefs_mod[4,1] + 
+  qnorm(c(.025)) * coefs_mod[4,2]
+year_95_p <- coefs_mod[4,1] + 
+  qnorm(c(.975)) * coefs_mod[4,2]
 #99%
-coefs_mod[4,1] + 
-  qnorm(c(.005, .995)) * coefs_mod[4,2]
+year_99_l <- coefs_mod[4,1] + 
+  qnorm(c(.005)) * coefs_mod[4,2]
+year_99_p <- coefs_mod[4,1] + 
+  qnorm(c(.995)) * coefs_mod[4,2]
 ```
+
+### Przedziały ufności dla zmiennej *year*:
+| Poziom istotności | Lewy przedział | Prawy przedział |
+|:-----------------:|:--------------:|:---------------:|
+|90%                |`r year_90_l`   |`r year_90_p`    |
+|95%                |`r year_95_l`   |`r year_95_p`    |
+|99%                |`r year_99_l`   |`r year_99_p`    |
 
 ##Przedziały ufności dla modelu bootstrap
-
-###90% przedział ufności dla zmiennej *horsepower*:
 
 ```{r, echo = FALSE}
 #90% bootstrapowy przedzial ufnosci 
 ##dla horsepower
-quantile(par_hors_vect, c(0.05, 0.95))
-```
-
-###95% przedział ufności dla zmiennej *horsepower*:
-
-```{r, echo = FALSE}
+horse_90_l_b <- quantile(par_hors_vect, c(0.05))
+horse_90_p_b <- quantile(par_hors_vect, c(0.95))
 #95%
-quantile(par_hors_vect, c(0.025, 0.975))
-```
-
-###99% przedział ufności dla zmiennej *horsepower*:
-
-```{r, echo = FALSE}
+horse_95_l_b <- quantile(par_hors_vect, c(0.025))
+horse_95_p_b <- quantile(par_hors_vect, c(0.975))
 #99%
-quantile(par_hors_vect, c(0.005, 0.995))
+horse_99_l_b <- quantile(par_hors_vect, c(0.005))
+horse_99_p_b <- quantile(par_hors_vect, c(0.995))
 ```
 
-###90% przedział ufności dla zmiennej *weight*:
+### Przedziały ufności dla zmiennej *horsepower*:
+| Poziom istotności | Lewy przedział | Prawy przedział |
+|:-----------------:|:--------------:|:---------------:|
+|90%                |`r horse_90_l_b`|`r horse_90_p_b` |
+|95%                |`r horse_95_l_b`|`r horse_95_p_b` |
+|99%                |`r horse_99_l_b`|`r horse_99_p_b` |
 
 ```{r, echo = FALSE}
-#90% bootstrapowy przedzial ufnosci 
-##dla weight
-quantile(par_weig_vect, c(0.05, 0.95))
-```
-
-###95% przedział ufności dla zmiennej *weight*:
-
-```{r, echo = FALSE}
+#90% bootstrapowy przedział ufności 
+#dla weight
+weight_90_l_b <- quantile(par_weig_vect, c(0.05))
+weight_90_p_b <- quantile(par_weig_vect, c(0.95))
 #95%
-quantile(par_weig_vect, c(0.025, 0.975))
-```
-
-###99% przedział ufności dla zmiennej *weight*:
-
-```{r, echo = FALSE}
+weight_95_l_b <- quantile(par_weig_vect, c(0.025))
+weight_95_p_b <- quantile(par_weig_vect, c(0.975))
 #99%
-quantile(par_weig_vect, c(0.005, 0.995))
+weight_99_l_b <- quantile(par_weig_vect, c(0.005))
+weight_99_p_b <- quantile(par_weig_vect, c(0.995))
 ```
 
-###90% przedział ufności dla zmiennej *year*:
+### Przedziały ufności dla zmiennej *weight*:
+| Poziom istotności | Lewy przedział  | Prawy przedział |
+|:-----------------:|:---------------:|:---------------:|
+|90%                |`r weight_90_l_b`|`r weight_90_p_b`|
+|95%                |`r weight_95_l_b`|`r weight_95_p_b`|
+|99%                |`r weight_99_l_b`|`r weight_99_p_b`|
 
 ```{r, echo = FALSE}
-#90% bootstrapowy przedzial ufnosci 
-##dla year
-quantile(par_year_vect, c(0.05, 0.95))
-```
-
-###95% przedział ufności dla zmiennej *year*:
-
-```{r, echo = FALSE}
+#90% bootstrapowy przedział ufności 
+#dla year
+year_90_l_b <- quantile(par_year_vect, c(0.05))
+year_90_p_b <- quantile(par_year_vect, c(0.95))
 #95%
-quantile(par_year_vect, c(0.025, 0.975))
-```
-
-###99% przedział ufności dla zmiennej *year*:
-
-```{r, echo = FALSE}
+year_95_l_b <- quantile(par_year_vect, c(0.025))
+year_95_p_b <- quantile(par_year_vect, c(0.975))
 #99%
-quantile(par_year_vect, c(0.005, 0.995))
+year_99_l_b <- quantile(par_year_vect, c(0.005))
+year_99_p_b <- quantile(par_year_vect, c(0.995))
 ```
+
+### Przedziały ufności dla zmiennej *year*:
+| Poziom istotności | Lewy przedział | Prawy przedział |
+|:-----------------:|:--------------:|:---------------:|
+|90%                |`r year_90_l_b` |`r year_90_p_b`  |
+|95%                |`r year_95_l_b` |`r year_95_p_b`  |
+|99%                |`r year_99_l_b` |`r year_99_p_b`  |
 
 ##Porównanie przedziałów
 

@@ -25,39 +25,40 @@ summary(samochodziki[,1:7])
 samochodziki %>% 
   ggplot(aes(x = displacement,  y = lp100k, size = horsepower)) +
   geom_smooth() +
-  geom_jitter(aes(col = as.factor(origin))) +
+  geom_jitter(aes(col = as.factor(origin)), alpha = 0.4) +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia"))
 #spalanie od cylindrów
 samochodziki %>% 
-  ggplot(aes(x = cylinders,  y = lp100k)) +
+  ggplot(aes(x = as.factor(cylinders),  y = lp100k)) +
+  geom_boxplot() +
   geom_jitter(aes(col = as.factor(origin))) +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia")) 
 #spalanie od koni mechanicznych
 samochodziki %>%
   ggplot(aes(x = horsepower, y = lp100k)) +
-  geom_point(aes(col = as.factor(origin))) +
+  geom_point(aes(col = as.factor(origin)), alpha = 0.6) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia")) 
 samochodziki %>%
   ggplot(aes(x = horsepower, y = lp100k)) +
-  geom_point(aes(col = as.factor(origin))) +
+  geom_point(aes(col = as.factor(origin)), alpha = 0.6) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia"))
 #spalanie od wagi
 samochodziki %>%
   ggplot(aes(x = weight, y = lp100k)) +
-  geom_point(aes(col = as.factor(origin))) +
+  geom_point(aes(col = as.factor(origin)), alpha = 0.8) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia")) 
 #spalanie od przyspieszenia
 samochodziki %>%
   ggplot(aes(x = acceleration, y = lp100k, size = horsepower)) +
-  geom_jitter(aes(col = as.factor(origin))) +
+  geom_jitter(aes(col = as.factor(origin)), alpha = 0.5) +
   geom_smooth() +
   scale_colour_discrete(name  ="Pochodzenie",
                         labels=c("USA", "Europa", "Japonia")) 
@@ -80,7 +81,7 @@ samochodziki %>%
 
 #Macierz korelacji
 cor(samochodziki[1:7])
-corrplot(cor(samochodziki[1:7]), method = "circle")
+corrplot(cor(samochodziki[1:7]), method = "number")
 #Macierz korelacji niewiele wyjaśnia, gdyż jak zauważyliśmy wcześniej mamy korelację pomiędzy liczbą cylindrów, pojemnością, liczbą koni mechanicznych oraz wagą
 
 #Dobór zmiennych
